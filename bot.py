@@ -2,6 +2,7 @@ import asyncio
 import os
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from aiohttp import web  # ← NEW — fake web server
 
 # 🔐 REPLACE THESE WITH YOUR KEYS
 DMARKET_PUBLIC_KEY = "10d5c6cee610d74936b547f743d03fc0d238036f2752b9b25c324efdb6327bb8"
@@ -28,11 +29,30 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❓ Reply BUY to start")
 
+# 🌐 FAKE WEB SERVER — BINDS TO PORT 10000 (FOR RENDER FREE TIER)
+async def handle(request):
+    return web.Response(text="🤖 Uganda Telegram Bot — Running 24/7")
+
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get('/', handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', int(os.environ.get('PORT', 10000)))
+    await site.start()
+    print(f"🌐 Fake web server running on port {os.environ.get('PORT', 10000)} — satisfies Render")
+
 def main():
+    # Start bot
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print("🤖 Bot started — send /start on Telegram")
+    
+    # Start fake web server
+    loop = asyncio.get_event_loop()
+    loop.create_task(start_web_server())
+    
+    print("🤖 Telegram bot started — send /start on Telegram")
     app.run_polling()
 
 if __name__ == "__main__":
